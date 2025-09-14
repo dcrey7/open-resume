@@ -11,6 +11,8 @@ import { Heading, Link, Paragraph } from "components/documentation";
 import { ResumeTable } from "resume-parser/ResumeTable";
 import { FlexboxSpacer } from "components/FlexboxSpacer";
 import { ResumeParserAlgorithmArticle } from "resume-parser/ResumeParserAlgorithmArticle";
+import { ParsingMethodSelector } from "resume-parser/ParsingMethodSelector";
+import { ManualPDFAnnotator } from "resume-parser/ManualPDFAnnotator";
 
 const RESUME_EXAMPLES = [
   {
@@ -35,77 +37,66 @@ const RESUME_EXAMPLES = [
   },
 ];
 
+type ParsingMethod = 'simple' | 'ocr' | 'manual';
+
 const defaultFileUrl = RESUME_EXAMPLES[0]["fileUrl"];
 export default function ResumeParser() {
   const [fileUrl, setFileUrl] = useState(defaultFileUrl);
   const [textItems, setTextItems] = useState<TextItems>([]);
+  const [parsingMethod, setParsingMethod] = useState<ParsingMethod>('simple');
+  const [manualAnnotations, setManualAnnotations] = useState<any>(null);
+
   const lines = groupTextItemsIntoLines(textItems || []);
   const sections = groupLinesIntoSections(lines);
   const resume = extractResumeFromSections(sections);
 
   useEffect(() => {
-    async function test() {
-      const textItems = await readPdf(fileUrl);
-      setTextItems(textItems);
+    // Only run simple parsing when method is 'simple'
+    if (parsingMethod === 'simple') {
+      async function test() {
+        const textItems = await readPdf(fileUrl);
+        setTextItems(textItems);
+      }
+      test();
+    } else {
+      // Clear simple parsing results when using other methods
+      setTextItems([]);
     }
-    test();
-  }, [fileUrl]);
+  }, [fileUrl, parsingMethod]);
 
   return (
     <main className="h-full w-full overflow-hidden">
-      <div className="grid md:grid-cols-6">
-        <div className="flex justify-center px-2 md:col-span-3 md:h-[calc(100vh-var(--top-nav-bar-height))] md:justify-end">
-          <section className="mt-5 grow px-4 md:max-w-[600px] md:px-0">
-            <div className="aspect-h-[9.5] aspect-w-7">
-              <iframe src={`${fileUrl}#navpanes=0`} className="h-full w-full" />
-            </div>
-          </section>
-          <FlexboxSpacer maxWidth={45} className="hidden md:block" />
-        </div>
-        <div className="flex px-6 text-gray-900 md:col-span-3 md:h-[calc(100vh-var(--top-nav-bar-height))] md:overflow-y-scroll">
-          <FlexboxSpacer maxWidth={45} className="hidden md:block" />
-          <section className="max-w-[600px] grow">
+      <div className="grid md:grid-cols-7">
+        {/* Left Side - Results */}
+        <div className="flex px-8 text-gray-900 md:col-span-3 md:h-[calc(100vh-var(--top-nav-bar-height))] md:overflow-y-scroll">
+          <section className="w-full grow">
             <Heading className="text-primary !mt-4">
-              Resume Parser Playground
+              Resume Parser
             </Heading>
-            <Paragraph smallMarginTop={true}>
-              This playground showcases the OpenResume resume parser and its
-              ability to parse information from a resume PDF. Click around the
-              PDF examples below to observe different parsing results.
-            </Paragraph>
-            <div className="mt-3 flex gap-3">
+
+            {/* Parsing Method Selector */}
+            <ParsingMethodSelector
+              selectedMethod={parsingMethod}
+              onMethodChange={setParsingMethod}
+            />
+
+            <div className="mt-3 flex gap-2">
               {RESUME_EXAMPLES.map((example, idx) => (
-                <article
+                <button
                   key={idx}
                   className={cx(
-                    "flex-1 cursor-pointer rounded-md border-2 px-4 py-3 shadow-sm outline-none hover:bg-gray-50 focus:bg-gray-50",
+                    "flex-1 cursor-pointer rounded-md border px-3 py-2 text-sm outline-none hover:bg-gray-50",
                     example.fileUrl === fileUrl
-                      ? "border-blue-400"
+                      ? "border-blue-400 bg-blue-50"
                       : "border-gray-300"
                   )}
                   onClick={() => setFileUrl(example.fileUrl)}
-                  onKeyDown={(e) => {
-                    if (["Enter", " "].includes(e.key))
-                      setFileUrl(example.fileUrl);
-                  }}
-                  tabIndex={0}
                 >
-                  <h1 className="font-semibold">Resume Example {idx + 1}</h1>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {example.description}
-                  </p>
-                </article>
+                  Example {idx + 1}
+                </button>
               ))}
             </div>
-            <Paragraph>
-              You can also{" "}
-              <span className="font-semibold">add your resume below</span> to
-              access how well your resume would be parsed by similar Application
-              Tracking Systems (ATS) used in job applications. The more
-              information it can parse out, the better it indicates the resume
-              is well formatted and easy to read. It is beneficial to have the
-              name and email accurately parsed at the very least.
-            </Paragraph>
+
             <div className="mt-3">
               <ResumeDropzone
                 onFileUrlChange={(fileUrl) =>
@@ -114,16 +105,91 @@ export default function ResumeParser() {
                 playgroundView={true}
               />
             </div>
-            <Heading level={2} className="!mt-[1.2em]">
-              Resume Parsing Results
-            </Heading>
-            <ResumeTable resume={resume} />
-            <ResumeParserAlgorithmArticle
-              textItems={textItems}
-              lines={lines}
-              sections={sections}
-            />
-            <div className="pt-24" />
+
+            {/* Results Section */}
+            <div className="mt-6">
+              {parsingMethod === 'simple' && textItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Extracted Information</h3>
+                  <ResumeTable resume={resume} />
+                </div>
+              )}
+
+              {parsingMethod === 'ocr' && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-yellow-800 font-medium">🚧 OCR Parsing - Coming Soon</p>
+                </div>
+              )}
+
+              {parsingMethod === 'manual' && manualAnnotations && manualAnnotations.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Extracted Tables</h3>
+                  <div className="flex gap-2 mb-4">
+                    <button
+                      onClick={() => {
+                        const csvContent = manualAnnotations.map((table: any) =>
+                          table.data.map((row: string[]) => row.join(',')).join('\n')
+                        ).join('\n\n');
+                        const blob = new Blob([csvContent], { type: 'text/csv' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'extracted_tables.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                    >
+                      Download CSV
+                    </button>
+                  </div>
+
+                  {manualAnnotations.map((tableData: any, tableIndex: number) => (
+                    <div key={tableIndex} className="mb-6">
+                      <h4 className="font-medium mb-2">Table {tableIndex + 1}</h4>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full border-collapse border border-gray-300">
+                          <tbody>
+                            {tableData.data.map((row: string[], rowIndex: number) => (
+                              <tr key={rowIndex} className={rowIndex === 0 ? 'bg-gray-100' : ''}>
+                                {row.map((cell: string, cellIndex: number) => (
+                                  <td
+                                    key={cellIndex}
+                                    className="border border-gray-300 px-2 py-1 text-sm"
+                                  >
+                                    {cell || ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-12" />
+          </section>
+        </div>
+
+        {/* Right Side - PDF Viewer */}
+        <div className="flex justify-center px-2 md:col-span-4 md:h-[calc(100vh-var(--top-nav-bar-height))] md:justify-start">
+          <section className="mt-5 grow px-4 md:px-2 w-full">
+            {parsingMethod === 'manual' ? (
+              <ManualPDFAnnotator
+                fileUrl={fileUrl}
+                onAnnotationsChange={setManualAnnotations}
+              />
+            ) : (
+              <ManualPDFAnnotator
+                fileUrl={fileUrl}
+                onAnnotationsChange={() => {}}
+                viewOnly={true}
+              />
+            )}
           </section>
         </div>
       </div>
